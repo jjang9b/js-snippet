@@ -3,11 +3,18 @@
 */
 const fs = require('fs');
 const request = require('request');
+const moment = require('moment');
+const { TelegramClient } = require('messaging-api-telegram');
+const tClient = TelegramClient.connect('770798205:AAEKBfqqKqAXaJynh-bfkIm6e7tb_mp6pi0');
+const TELEGRAM_M_ID = -317448016;
 const INTV = 300;
 const URI = 'https://section.cafe.naver.com/ArticleSearchAjax.nhn';
 const KEYWORD = '원피스 피규어';
+const LIMIT_MIN = 30;
 
 let intvCrawl = setInterval(() => {
+  clearInterval(intvCrawl);
+
   let formData = {
     query: KEYWORD,
     sortBy: 1,
@@ -29,8 +36,6 @@ let intvCrawl = setInterval(() => {
     url: URI,
     form: formData
   }, (err, res, body) => {
-    clearInterval(intvCrawl);
-
     if (err) {
       console.log('[ERR]', err);
       throw err;
@@ -42,6 +47,7 @@ let intvCrawl = setInterval(() => {
 
       if (resJson['isSuccess']) {
           let list = resJson['result']['searchList'];
+          let msg = `[${KEYWORD}][${moment().format('YY-MM-DD HH:mm')}]\n`;
 
           list.forEach((v) => {
             let title = v['articletitle'];
@@ -54,19 +60,19 @@ let intvCrawl = setInterval(() => {
 
             let price = content.match(/가격\s*\w+\,*\w+\s*원/ig);
             let priceTwo = content.match(/\w+\,*\w+\s*원/ig);
+            let writeDate = v['writeDate'];
             let link = 'https://cafe.naver.com' + v['linkUrl'];
 
-            console.log(`제목 : ${title}\n내용 : ${content}\n${price}\n${priceTwo}\n${link}\n`);
-          });
+            if (writeDate.indexOf('분') >= 0) {
+              let writeMin = writeDate.replace('분 전', '').trim();
 
-          /*
-          fs.writeFile('result.json', cleanBody, (err) => {
-            if (err) {
-              console.log('[FS ERR]', err);
-              throw err;
+              if (parseInt(writeMin) <= LIMIT_MIN) {
+                msg += `제목 : ${title}\n내용 : ${content}\n가격 정보 : ${price} | ${priceTwo}\n날짜 : ${writeDate}\n링크 : ${link}\n\n`;
+              }
             }
           });
-          */
+
+          tClient.sendMessage(TELEGRAM_M_ID, msg, {});
       }
     } catch (e) {
       console.log(e.message);
